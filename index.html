@@ -218,9 +218,9 @@ h1 .cinq{color:var(--accent)}
         <button type="button" data-lang="fr" aria-pressed="true" lang="fr">FR</button>
         <button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button>
       </div>
-      <button type="button" class="install" id="install" hidden>
+      <button type="button" class="install" id="install">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-        <span data-i18n="install">Installer l'app</span>
+        <span data-i18n="install">Télécharger l'app</span>
       </button>
       <a class="don" id="don" href="https://ko-fi.com/parisa5balles_" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2v20"/><path d="M4 2v6a3 3 0 0 0 6 0V2"/><path d="M17 22V2c-2.2 0-4 2.7-4 6v5h4"/></svg>
@@ -298,7 +298,7 @@ h1 .cinq{color:var(--accent)}
 
   <footer>
     <span data-i18n="footerNote">Prix relevés sur place pour le plat indiqué, boisson non comprise sauf mention. Un prix a bougé ? Signale-le sur Instagram.</span>
-    <span class="foot-links"><a href="https://www.instagram.com/paris_a_5_balles/" target="_blank" rel="noopener">@paris_a_5_balles</a><a href="https://ko-fi.com/parisa5balles_" id="don2" target="_blank" rel="noopener" data-i18n="don2">Offrir un repas sur Ko-fi</a></span>
+    <span class="foot-links"><a href="#" id="install2" data-i18n="install">Télécharger l'app</a><a href="https://www.instagram.com/paris_a_5_balles/" target="_blank" rel="noopener">@paris_a_5_balles</a><a href="https://ko-fi.com/parisa5balles_" id="don2" target="_blank" rel="noopener" data-i18n="don2">Offrir un repas sur Ko-fi</a></span>
   </footer>
 </div>
 
@@ -401,7 +401,7 @@ const I18N = {
     metaDesc:"Les adresses de Paris où manger pour 5 € (jusqu'à 5,99 €), par style de cuisine et par arrondissement, avec carte et itinéraire.",
     arrRange:"Paris · 1<sup>er</sup> au 20<sup>e</sup> arr.",
     tagline:"Les adresses où l'on mange à Paris pour 5 balles, centimes compris (jusqu'à 5,99 €). Testées sur place, triées par style et par arrondissement.",
-    don:"Offrir un repas à 5 €", don2:"Offrir un repas sur Ko-fi", install:"Installer l'app",
+    don:"Offrir un repas à 5 €", don2:"Offrir un repas sur Ko-fi", install:"Télécharger l'app",
     filters:"Filtres", searchPh:"Nom, plat, rue…", styleLabel:"Style de cuisine", arrLabel:"Arrondissement",
     priceLabel:"Prix max", priceHint:"centimes compris", sortLabel:"Trier par", sortPrix:"Prix croissant", sortArr:"Arrondissement", sortNom:"Nom (A → Z)",
     reset:"Tout réinitialiser", mapTitle:"Carte des adresses filtrées", mapHint:"Touche un prix pour lancer l'itinéraire",
@@ -410,7 +410,10 @@ const I18N = {
     close:"Fermer", prev:"Photo précédente", next:"Photo suivante", lbLabel:"Photos du restaurant",
     iosTitle:"Installer sur ton téléphone", ios1:"Touche le bouton Partager (le carré avec une flèche vers le haut) dans Safari.",
     ios2:"Fais défiler et choisis « Sur l'écran d'accueil ».", ios3:"Touche « Ajouter » : l'icône Paris à 5 balles apparaît avec tes apps.", ok:"Compris",
-    otherTitle:"Installer l'app", other1:"Ouvre le menu de ton navigateur (⋮ ou ⋯).", other2:"Choisis « Installer l'application » ou « Ajouter à l'écran d'accueil ».", other3:"L'icône Paris à 5 balles apparaît avec tes apps.",
+    otherTitle:"Télécharger l'app", other1:"Ouvre le menu de ton navigateur (⋮ ou ⋯).", other2:"Choisis « Installer l'application » ou « Ajouter à l'écran d'accueil ».", other3:"L'icône Paris à 5 balles apparaît avec tes apps.",
+    macTitle:"Télécharger l'app sur Mac", mac1:"Dans Safari, ouvre le menu Fichier (ou le bouton Partager).", mac2:"Choisis « Ajouter au Dock ».", mac3:"Paris à 5 balles s'ouvre ensuite comme une app depuis le Dock.",
+    deskTitle:"Télécharger l'app sur ordinateur", desk1:"Ce navigateur ne sait pas installer d'app web : ouvre le site dans Chrome ou Edge.", desk2:"Clique sur l'icône d'installation à droite de la barre d'adresse.", desk3:"Sur téléphone, ouvre simplement le site et touche « Télécharger l'app ».",
+    installed:"L'app est déjà installée sur cet appareil.",
     all:"Tous", allParis:"Tout Paris", arrOpt:a=>`${a} arrondissement`,
     count:n=>`<b>${n}</b> adresse${n>1?"s":""}`, empty:"Aucune adresse ne correspond. Élargis l'arrondissement ou monte le prix max.",
     forPrice:"Pour ce prix : ", seeMap:"Voir sur la carte", go:"Y aller →", restoName:"Nom du restaurant", addAddr:"Adresse à ajouter",
@@ -424,7 +427,7 @@ const I18N = {
     metaDesc:"Places in Paris where you can eat for €5 (up to €5.99), by food style and district, with a map and directions.",
     arrRange:"Paris · 1<sup>st</sup> to 20<sup>th</sup> arr.",
     tagline:"Where to eat in Paris for 5 balles (French slang for euros), cents included: up to €5.99. Tested in person, sorted by food style and district.",
-    don:"Buy me a €5 meal", don2:"Buy me a meal on Ko-fi", install:"Install the app",
+    don:"Buy me a €5 meal", don2:"Buy me a meal on Ko-fi", install:"Download the app",
     filters:"Filters", searchPh:"Name, dish, street…", styleLabel:"Food style", arrLabel:"District",
     priceLabel:"Max price", priceHint:"cents included", sortLabel:"Sort by", sortPrix:"Lowest price", sortArr:"District", sortNom:"Name (A → Z)",
     reset:"Reset all", mapTitle:"Map of filtered places", mapHint:"Tap a price to get directions",
@@ -433,7 +436,10 @@ const I18N = {
     close:"Close", prev:"Previous photo", next:"Next photo", lbLabel:"Restaurant photos",
     iosTitle:"Install on your phone", ios1:"Tap the Share button (the square with an up arrow) in Safari.",
     ios2:"Scroll down and choose “Add to Home Screen”.", ios3:"Tap “Add”: the Paris à 5 balles icon appears with your apps.", ok:"Got it",
-    otherTitle:"Install the app", other1:"Open your browser menu (⋮ or ⋯).", other2:"Choose “Install app” or “Add to Home Screen”.", other3:"The Paris à 5 balles icon appears with your apps.",
+    otherTitle:"Download the app", other1:"Open your browser menu (⋮ or ⋯).", other2:"Choose “Install app” or “Add to Home Screen”.", other3:"The Paris à 5 balles icon appears with your apps.",
+    macTitle:"Download the app on Mac", mac1:"In Safari, open the File menu (or the Share button).", mac2:"Choose “Add to Dock”.", mac3:"Paris à 5 balles then opens like an app from your Dock.",
+    deskTitle:"Download the app on desktop", desk1:"This browser can't install web apps: open the site in Chrome or Edge.", desk2:"Click the install icon on the right of the address bar.", desk3:"On your phone, just open the site and tap “Download the app”.",
+    installed:"The app is already installed on this device.",
     all:"All", allParis:"All of Paris", arrOpt:a=>`${a} arrondissement`,
     count:n=>`<b>${n}</b> place${n>1?"s":""}`, empty:"No place matches. Try another district or a higher max price.",
     forPrice:"For this price: ", seeMap:"Show on map", go:"Directions →", restoName:"Restaurant name", addAddr:"Address to add",
@@ -785,19 +791,30 @@ $("lang").addEventListener("click", e => { const b = e.target.closest("button[da
 const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 let installEvt = null;
-window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; if (!isStandalone()) $("install").hidden = false; });
-window.addEventListener("appinstalled", () => { installEvt = null; $("install").hidden = true; });
-if (isIOS && !isStandalone()) $("install").hidden = false;   // Safari iOS : pas d'invite automatique, on affiche le mode d'emploi
+const isAndroid = /Android/i.test(navigator.userAgent);
+const isMacSafari = !isIOS && /Macintosh/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent);
+function syncInstall(){ const hide = isStandalone(); $("install").hidden = hide; $("install2").hidden = hide; }
+syncInstall();
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; });
+window.addEventListener("appinstalled", () => { installEvt = null; $("install").hidden = true; $("install2").hidden = true; });
 function showHelp(kind){
-  const k = kind === "ios" ? ["iosTitle","ios1","ios2","ios3"] : ["otherTitle","other1","other2","other3"];
+  const k = { ios:["iosTitle","ios1","ios2","ios3"], android:["otherTitle","other1","other2","other3"],
+              mac:["macTitle","mac1","mac2","mac3"], desk:["deskTitle","desk1","desk2","desk3"] }[kind];
   $("ios-help-title").textContent = T(k[0]);
   $("ios-help").querySelectorAll("li").forEach((li,i) => li.textContent = T(k[i+1]));
   $("ios-help").hidden = false; $("ios-help-ok").focus();
 }
-$("install").addEventListener("click", async () => {
-  if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice; if (r.outcome === "accepted") $("install").hidden = true; installEvt = null; }
-  else showHelp(isIOS ? "ios" : "other");
-});
+async function doInstall(e){
+  e?.preventDefault?.();
+  if (installEvt) {                       // Chrome, Edge, Android : vraie fenêtre d'installation
+    installEvt.prompt(); const r = await installEvt.userChoice; installEvt = null;
+    if (r.outcome === "accepted") { $("install").hidden = true; $("install2").hidden = true; }
+    return;
+  }
+  showHelp(isIOS ? "ios" : isAndroid ? "android" : isMacSafari ? "mac" : "desk");
+}
+$("install").addEventListener("click", doInstall);
+$("install2").addEventListener("click", doInstall);
 $("ios-help-ok").addEventListener("click", () => { $("ios-help").hidden = true; $("install").focus(); });
 $("ios-help").addEventListener("click", e => { if (e.target.id === "ios-help") $("ios-help").hidden = true; });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("ios-help").hidden) $("ios-help").hidden = true; });
