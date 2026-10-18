@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" id="meta-desc" content="Les adresses de Paris où manger pour 5 € (jusqu'à 5,99 €), par style de cuisine et par arrondissement, avec carte et itinéraire.">
+<title>Paris à 5 balles</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1d3768">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="5 balles">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Figtree:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : plaque de rue parisienne en tête, barre de filtres, grille de fiches "ticket" */
+:root{
+  --bg:#f2f3f7; --surface:#ffffff; --ink:#18213a; --muted:#5d6680; --line:#d9dce6;
+  --plaque:#1d3768; --plaque-ink:#ffffff; --plaque-edge:#2f8f5b;
+  --accent:#e8b21c; --accent-ink:#1b1606; --todo:#b8441f; --chip:#e6e9f2;
+  --map-bg:#e4e7ef; --seine:#9fb6d8; --peri:#b3b9c9; --tile-filter:saturate(.55) contrast(.95);
+  --f-display:"Anton", "Impact", "Arial Narrow", sans-serif;
+  --f-body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1424; --surface:#171e33; --ink:#e9ecf5; --muted:#98a1bb; --line:#2a3350;
+  --plaque:#21407a; --plaque-ink:#ffffff; --plaque-edge:#3aa56c;
+  --accent:#f0c040; --accent-ink:#1b1606; --todo:#ef8a63; --chip:#222b45;
+  --map-bg:#141b2e; --seine:#2c4a78; --peri:#3a4462; --tile-filter:invert(.92) hue-rotate(185deg) saturate(.5) brightness(.95); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1424; --surface:#171e33; --ink:#e9ecf5; --muted:#98a1bb; --line:#2a3350;
+  --plaque:#21407a; --plaque-ink:#ffffff; --plaque-edge:#3aa56c;
+  --accent:#f0c040; --accent-ink:#1b1606; --todo:#ef8a63; --chip:#222b45;
+  --map-bg:#141b2e; --seine:#2c4a78; --peri:#3a4462; --tile-filter:invert(.92) hue-rotate(185deg) saturate(.5) brightness(.95); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:22px}
+
+/* En-tête */
+header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.plaque{background:var(--plaque);color:var(--plaque-ink);border-radius:10px;padding:6px;box-shadow:0 2px 0 rgba(0,0,0,.15)}
+.plaque-in{border:2px solid var(--plaque-ink);border-radius:6px;padding:8px 18px 10px;text-align:center;position:relative}
+.plaque-in::before{content:"";position:absolute;inset:3px;border:1px solid var(--plaque-edge);border-radius:4px;pointer-events:none}
+.arr{font-family:var(--f-body);font-weight:600;font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.85}
+.arr sup{font-size:.7em}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(30px,6vw,46px);letter-spacing:.04em;text-transform:uppercase;line-height:1.05;margin:2px 0 0;text-wrap:balance}
+.tagline{color:var(--muted);max-width:44ch;margin:6px 0 0}
+.don{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;text-decoration:none;padding:10px 16px;border-radius:999px;white-space:nowrap}
+.don:hover{filter:brightness(1.05)}
+.don:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.don svg{width:18px;height:18px}
+
+/* Filtres */
+.filters{display:flex;flex-direction:column;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.search{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:var(--bg)}
+.search svg{width:18px;height:18px;color:var(--muted);flex:none}
+.search input{border:0;background:transparent;color:var(--ink);font:inherit;padding:11px 0;width:100%;min-width:0}
+.search input:focus{outline:none}
+.label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chip{flex:none;border:1px solid transparent;background:var(--chip);color:var(--ink);font:inherit;font-weight:500;font-size:14px;padding:7px 13px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--plaque);color:var(--plaque-ink)}
+.chip .n{font-family:var(--f-mono);font-size:12px;opacity:.7;margin-left:4px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;align-items:end}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+.price-line{display:flex;justify-content:space-between;align-items:baseline}
+.price-line output{font-family:var(--f-mono);font-weight:500}
+input[type=range]{width:100%;accent-color:var(--plaque)}
+.toggles{display:flex;flex-wrap:wrap;gap:8px}
+.tog{display:inline-flex;gap:6px;align-items:center;font-size:14px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;user-select:none}
+.tog input{accent-color:var(--plaque);margin:0}
+.bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+.count{font-family:var(--f-mono);font-size:14px;color:var(--muted)}
+.count b{color:var(--ink);font-weight:500}
+.reset{background:none;border:0;color:var(--muted);font:inherit;font-size:14px;text-decoration:underline;cursor:pointer;padding:4px}
+
+/* Bandeau remplissage */
+.notice{display:flex;gap:12px;align-items:flex-start;border:1px dashed var(--todo);border-radius:12px;padding:12px 14px;font-size:14px}
+.notice b{color:var(--todo)}
+.notice code{font-family:var(--f-mono);font-size:13px;background:var(--chip);padding:1px 5px;border-radius:4px}
+
+/* Fiches */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.card-top{display:flex;justify-content:space-between;gap:12px;padding:14px 16px 10px;align-items:flex-start}
+.card h2{font-size:17px;font-weight:700;margin:0;line-height:1.25;text-wrap:balance}
+.card.todo h2{color:var(--muted);font-style:italic;font-weight:600}
+.style{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.prix{font-family:var(--f-display);font-size:30px;line-height:1;letter-spacing:.02em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.prix small{font-family:var(--f-body);font-size:13px;font-weight:600;margin-left:1px}
+.prix.vide{color:var(--line)}
+.perfo{border-top:2px dashed var(--line);margin:0 12px}
+.card-body{padding:10px 16px 14px;display:flex;flex-direction:column;gap:8px;flex:1}
+.plat{font-size:14px}
+.plat .k{color:var(--muted)}
+.addr{font-size:14px;color:var(--muted)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:12px;background:var(--chip);border-radius:6px;padding:2px 8px}
+.tag.cash{background:transparent;color:var(--todo);border:1px solid var(--todo);font-weight:600}
+.card-foot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--line);margin-top:auto}
+.arr-badge{font-family:var(--f-mono);font-size:13px;font-weight:500;background:var(--plaque);color:var(--plaque-ink);border-radius:6px;padding:2px 8px}
+.arr-badge.vide{background:var(--chip);color:var(--muted)}
+.maplink{font-size:14px;font-weight:600;color:var(--ink);text-decoration:none;display:inline-flex;gap:5px;align-items:center}
+.maplink svg{width:15px;height:15px}
+.maplink[aria-disabled="true"]{color:var(--muted);pointer-events:none;font-weight:500}
+.todo-flag{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--todo)}
+.empty{text-align:center;color:var(--muted);padding:40px 16px;border:1px dashed var(--line);border-radius:12px}
+
+/* Carte */
+.map-wrap{display:flex;flex-direction:column;gap:8px}
+.map-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.map-head .hint{font-size:13px;color:var(--muted)}
+#map{height:clamp(320px,52vh,480px);border-radius:14px;border:1px solid var(--line);background:var(--map-bg);overflow:hidden;z-index:0}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--plaque);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--plaque)}
+.dot.approx{background:var(--surface);border:2px dashed var(--todo);box-shadow:none}
+
+/* Leaflet : style officiel chargé dans <head>, ici seulement les couleurs du site */
+.leaflet-container{font-family:var(--f-body);background:var(--map-bg)}
+.leaflet-tile-pane{filter:var(--tile-filter)}
+.leaflet-bar{border-radius:10px!important;border:1px solid var(--line)!important;overflow:hidden;box-shadow:none!important}
+.leaflet-bar a{background:var(--surface);color:var(--ink);border-bottom-color:var(--line)}
+.leaflet-bar a:hover{background:var(--chip);color:var(--ink)}
+.leaflet-control-attribution{background:var(--surface)!important;color:var(--muted)}
+.leaflet-control-attribution a{color:var(--muted)}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink)}
+.leaflet-popup-content-wrapper{border-radius:12px;border:1px solid var(--line)}
+.leaflet-popup-content{margin:12px 14px;min-width:200px}
+.leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
+
+/* Marqueurs prix */
+.leaflet-div-icon.pin{background:none;border:0}
+.pin-b{display:inline-flex;align-items:center;justify-content:center;transform:translate(-50%,-100%);position:absolute;left:0;top:0;white-space:nowrap;
+  background:var(--plaque);color:var(--plaque-ink);font:500 12px/1 var(--f-mono);padding:5px 7px;border-radius:8px;border:2px solid var(--surface);box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.pin-b::after{content:"";position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--plaque);border-bottom:0}
+.pin-b.approx{background:var(--surface);color:var(--todo);border:2px dashed var(--todo);box-shadow:none}
+.pin-b.approx::after{border-top-color:var(--todo)}
+.pin-b.active{background:var(--accent);color:var(--accent-ink)}
+.pin-b.active::after{border-top-color:var(--accent)}
+
+/* Popup */
+.pop h3{margin:0 18px 2px 0;font-size:15px;line-height:1.25}
+.pop .s{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.pop .a{font-size:13px;color:var(--muted);margin:6px 0 10px}
+.pop .warn{font-size:12px;color:var(--todo);margin:-4px 0 10px}
+.nav{display:flex;flex-direction:column;gap:6px}
+.nav a{display:flex;justify-content:space-between;align-items:center;text-decoration:none;font-weight:600;font-size:14px;padding:8px 10px;border-radius:8px;background:var(--chip);color:var(--ink)}
+.nav a:first-child{background:var(--plaque);color:var(--plaque-ink)}
+.nav a span{font-size:12px;font-weight:500;opacity:.75}
+.locate{background:none;border:0;padding:0;font:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;display:inline-flex;gap:5px;align-items:center}
+.locate svg{width:15px;height:15px}
+
+/* Photos */
+.photo{position:relative;display:block;width:100%;aspect-ratio:4/3;max-width:100%;border:0;padding:0;background:var(--chip);cursor:zoom-in;overflow:hidden}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.photo .nb{position:absolute;right:10px;bottom:10px;display:inline-flex;gap:5px;align-items:center;background:rgba(10,16,32,.72);color:#fff;font:500 12px/1 var(--f-mono);padding:5px 8px;border-radius:999px}
+.photo .nb svg{width:13px;height:13px}
+.pop-photo{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;margin:2px 0 10px;background:var(--chip);cursor:zoom-in;border:0;padding:0}
+.pop-photo img{width:100%;height:100%;object-fit:cover;border-radius:8px;display:block}
+
+.lb{position:fixed;inset:0;z-index:5000;background:rgba(6,10,22,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  padding:calc(env(safe-area-inset-top,0px) + 56px) 16px calc(env(safe-area-inset-bottom,0px) + 24px);touch-action:pan-y}
+.lb img{max-width:100%;max-height:100%;min-height:0;object-fit:contain;border-radius:6px;flex:1 1 auto}
+.lb-cap{color:#e9ecf5;font-size:14px;text-align:center;max-width:60ch;min-height:1.4em}
+.lb-cap .c{font-family:var(--f-mono);opacity:.7;margin-left:6px}
+.lb button{position:absolute;border:0;background:rgba(255,255,255,.12);color:#fff;width:44px;height:44px;border-radius:50%;font:24px/44px var(--f-body);cursor:pointer;display:grid;place-items:center}
+.lb button:hover{background:rgba(255,255,255,.22)}
+.lb .x{top:calc(env(safe-area-inset-top,0px) + 10px);right:12px}
+.lb .prev{left:12px;top:50%;transform:translateY(-50%)}
+.lb .next{right:12px;top:50%;transform:translateY(-50%)}
+
+footer{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:14px}
+footer a{color:var(--ink)}
+.hint-prix{font-size:12px;color:var(--muted)}
+.foot-links{display:flex;flex-wrap:wrap;gap:16px}
+h1 .cinq{color:var(--accent)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.lang{display:inline-grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface)}
+.lang button{border:0;background:transparent;color:var(--ink);font:600 13px/1 var(--f-body);padding:10px 12px;cursor:pointer;letter-spacing:.04em}
+.lang button[aria-pressed="true"]{background:var(--plaque);color:var(--plaque-ink)}
+.install{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--plaque);background:var(--surface);color:var(--ink);font:600 15px/1 var(--f-body);padding:10px 14px;border-radius:999px;cursor:pointer}
+.install svg{width:18px;height:18px}
+.install:hover{background:var(--chip)}
+.sheet{position:fixed;inset:0;z-index:6000;background:rgba(6,10,22,.55);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.sheet-in{background:var(--surface);color:var(--ink);border-radius:18px;max-width:440px;width:100%;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.sheet-in h2{margin:0;font-size:19px}
+.sheet-in ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;line-height:1.45}
+.sheet-in button{align-self:flex-end;border:0;background:var(--plaque);color:var(--plaque-ink);font:600 15px/1 var(--f-body);padding:11px 18px;border-radius:999px;cursor:pointer}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.seg button{border:0;background:transparent;color:var(--ink);font:500 14px/1 var(--f-mono);padding:11px 0;cursor:pointer;font-variant-numeric:tabular-nums}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--plaque);color:var(--plaque-ink)}
+@media (prefers-reduced-motion:no-preference){.card{transition:transform .15s}.card:hover{transform:translateY(-2px)}}
+</style>
+<style>html{-webkit-text-size-adjust:100%}body{margin:0}[hidden]{display:none!important}img{max-width:100%}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="plaque"><div class="plaque-in">
+        <div class="arr" data-i18n-html="arrRange">Paris · 1<sup>er</sup> au 20<sup>e</sup> arr.</div>
+        <h1>Paris à <span class="cinq">5</span> balles</h1>
+      </div></div>
+      <p class="tagline" data-i18n="tagline">Les adresses où l'on mange à Paris pour 5 balles, centimes compris (jusqu'à 5,99 €). Testées sur place, triées par style et par arrondissement.</p>
+    </div>
+    <div class="actions">
+      <div class="lang" id="lang" role="group" aria-label="Langue / Language">
+        <button type="button" data-lang="fr" aria-pressed="true" lang="fr">FR</button>
+        <button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button>
+      </div>
+      <button type="button" class="install" id="install" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        <span data-i18n="install">Installer l'app</span>
+      </button>
+      <a class="don" id="don" href="https://ko-fi.com/parisa5balles_" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2v20"/><path d="M4 2v6a3 3 0 0 0 6 0V2"/><path d="M17 22V2c-2.2 0-4 2.7-4 6v5h4"/></svg>
+        <span data-i18n="don">Offrir un repas à 5 €</span>
+      </a>
+    </div>
+  </header>
+
+  <section class="filters" aria-label="Filtres" data-i18n-aria="filters">
+    <label class="search" for="q">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Nom, plat, rue…" data-i18n-ph="searchPh" autocomplete="off">
+    </label>
+
+    <div class="field">
+      <span class="label" data-i18n="styleLabel">Style de cuisine</span>
+      <div class="chips" id="chips" role="group" aria-label="Style de cuisine"></div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label class="label" for="arr" data-i18n="arrLabel">Arrondissement</label>
+        <select id="arr"></select>
+      </div>
+      <div class="field">
+        <div class="price-line"><span class="label" id="max-label" data-i18n="priceLabel">Prix max</span><span class="hint-prix" data-i18n="priceHint">centimes compris</span></div>
+        <div class="seg" id="max" role="group" aria-labelledby="max-label">
+          <button type="button" data-max="2" aria-pressed="false" title="Jusqu'à 2,99 €">2,xx €</button>
+          <button type="button" data-max="3" aria-pressed="false" title="Jusqu'à 3,99 €">3,xx €</button>
+          <button type="button" data-max="4" aria-pressed="false" title="Jusqu'à 4,99 €">4,xx €</button>
+          <button type="button" data-max="5" aria-pressed="true" title="Jusqu'à 5,99 €">5,xx €</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="sort" data-i18n="sortLabel">Trier par</label>
+        <select id="sort">
+          <option value="prix" data-i18n="sortPrix">Prix croissant</option>
+          <option value="arr" data-i18n="sortArr">Arrondissement</option>
+          <option value="nom" data-i18n="sortNom">Nom (A → Z)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="toggles" role="group" aria-label="Options">
+      <label class="tog"><input type="checkbox" id="t-vege" data-tag="végé"> <span data-tagtoggle="végé">Végé possible</span></label>
+      <label class="tog"><input type="checkbox" id="t-surplace" data-tag="sur place"> <span data-tagtoggle="sur place">Sur place</span></label>
+      <label class="tog"><input type="checkbox" id="t-soir" data-tag="ouvert le soir"> <span data-tagtoggle="ouvert le soir">Ouvert le soir</span></label>
+      <label class="tog"><input type="checkbox" id="t-dim" data-tag="ouvert dimanche"> <span data-tagtoggle="ouvert dimanche">Ouvert dimanche</span></label>
+      <label class="tog"><input type="checkbox" id="t-cb" data-tag="CB acceptée"> <span data-tagtoggle="CB acceptée">CB acceptée</span></label>
+    </div>
+
+    <div class="bar">
+      <span class="count" id="count"></span>
+      <button class="reset" id="reset" type="button" data-i18n="reset">Tout réinitialiser</button>
+    </div>
+  </section>
+
+  <section class="map-wrap" aria-label="Carte des restaurants">
+    <div class="map-head">
+      <span class="label" data-i18n="mapTitle">Carte des adresses filtrées</span>
+      <span class="hint" data-i18n="mapHint">Touche un prix pour lancer l'itinéraire</span>
+    </div>
+    <div id="map" role="region" aria-label="Carte de Paris"></div>
+    <div class="legend">
+      <span><i class="dot"></i><span data-i18n="legendExact">Adresse exacte</span></span>
+      <span><i class="dot approx"></i><span data-i18n="legendApprox">Position approximative (centre de l'arrondissement)</span></span>
+    </div>
+  </section>
+
+  <div class="notice" id="notice">
+    <div><b>Fiches à remplir.</b> Les emplacements en italique sont vides. Complète le tableau <code>RESTOS</code> en haut du script (nom, adresse, arrondissement, prix, plat, tags, photos) et ils s'afficheront normalement.</div>
+  </div>
+
+  <main class="grid" id="grid" aria-live="polite"></main>
+
+  <footer>
+    <span data-i18n="footerNote">Prix relevés sur place pour le plat indiqué, boisson non comprise sauf mention. Un prix a bougé ? Signale-le sur Instagram.</span>
+    <span class="foot-links"><a href="https://www.instagram.com/paris_a_5_balles/" target="_blank" rel="noopener">@paris_a_5_balles</a><a href="https://ko-fi.com/parisa5balles_" id="don2" target="_blank" rel="noopener" data-i18n="don2">Offrir un repas sur Ko-fi</a></span>
+  </footer>
+</div>
+
+<div class="sheet" id="ios-help" hidden role="dialog" aria-modal="true" aria-labelledby="ios-help-title">
+  <div class="sheet-in">
+    <h2 id="ios-help-title" data-i18n="iosTitle">Installer sur ton téléphone</h2>
+    <ol>
+      <li data-i18n="ios1">Touche le bouton Partager (le carré avec une flèche vers le haut) dans Safari.</li>
+      <li data-i18n="ios2">Fais défiler et choisis « Sur l'écran d'accueil ».</li>
+      <li data-i18n="ios3">Touche « Ajouter » : l'icône Paris à 5 balles apparaît avec tes apps.</li>
+    </ol>
+    <button type="button" id="ios-help-ok" data-i18n="ok">Compris</button>
+  </div>
+</div>
+
+<div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Photos du restaurant" data-i18n-aria="lbLabel">
+  <button type="button" class="x" id="lb-x" aria-label="Fermer" data-i18n-aria="close">×</button>
+  <button type="button" class="prev" id="lb-prev" aria-label="Photo précédente" data-i18n-aria="prev">‹</button>
+  <img id="lb-img" alt="">
+  <button type="button" class="next" id="lb-next" aria-label="Photo suivante" data-i18n-aria="next">›</button>
+  <div class="lb-cap" id="lb-cap"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const KOFI_URL = "https://ko-fi.com/parisa5balles_";
+
+/* Styles de cuisine disponibles dans les filtres */
+const STYLES = [
+  "Boulangerie","Sandwich","Raviolis / Bao","Vietnamien","Chinois","Japonais",
+  "Libanais / Falafel","Indien","Africain","Crêperie","Pizza à la part","Burger",
+  "Végétarien","Street food","Sucré"
+];
+
+/* ============================================================
+   RESTOS — une ligne par adresse
+   nom    : nom du restaurant (vide = fiche à remplir)
+   style  : une valeur de STYLES
+   arr    : arrondissement (1 à 20)
+   adresse: rue + numéro
+   prix   : prix du plat indiqué, jusqu'à 5,99 € (ex. 5.9 pour 5,90 €)
+   plat   : ce qu'on prend pour ce prix
+   plat_en: (optionnel) la même chose en anglais, affichée quand le site est en EN
+   tags   : "végé", "sur place", "ouvert le soir", "ouvert dimanche", "CB acceptée",
+            "espèces uniquement" (s'affiche en alerte sur la fiche et sur la carte)
+   photos : (optionnel) liste de photos, la première sert de couverture.
+            Mets les fichiers dans un dossier "photos" à côté de index.html :
+              photos:["photos/banh-mi-13.jpg", "photos/banh-mi-13-2.jpg"]
+            Tu peux ajouter une légende :
+              photos:[{ src:"photos/nicos.jpg", legende:"La crêpe complète", legende_en:"The full crêpe" }]
+            Une adresse web complète (https://…) marche aussi.
+   lat/lng: (optionnel) position exacte, ex. lat:48.8566, lng:2.3522
+            → clic droit sur Google Maps > copier les coordonnées.
+            Sans lat/lng, le site cherche la position à partir de l'adresse
+            (une fois en ligne), sinon place la fiche au centre de l'arrondissement.
+   ============================================================ */
+const RESTOS = [
+  { nom:"", style:"Boulangerie",    arr:10, adresse:"", prix:null, plat:"", tags:[], photos:[] },
+  { nom:"", style:"Raviolis / Bao", arr:20, adresse:"", prix:null, plat:"", tags:[], photos:[] },
+  { nom:"Banh Mi 13", style:"Vietnamien", arr:13, adresse:"73 avenue de Choisy 75013 Paris", prix:5, plat:"Banh mi œuf au plat & pâté (porc grillé ou tofu : 5,50 €)", plat_en:"Fried egg & pâté banh mi (grilled pork or tofu: €5.50)", tags:["végé", "ouvert dimanche", "espèces uniquement"], photos:["photos/banh_mi_13.png"] },
+  { nom:"Mangez et cassez-vous", style:"Burger", arr:11, adresse:"64 rue Alexandre-Dumas 75011 Paris", prix:3.6, plat:"Burger maison au choix (5 recettes). Avec frites nature : 5 € pile", plat_en:"House burger, 5 recipes to choose from. With plain fries: exactly €5", tags:["CB acceptée"], photos:[{ src:"photos/mangez-et-cassez-vous.jpg", legende:"Burger maison + frites nature : 5 €", legende_en:"House burger + plain fries: €5" }, { src:"photos/mangez-et-cassez-vous-menu.jpg", legende:"Le menu : burger 3,60 €, frites dès 1,40 €", legende_en:"The menu: burger €3.60, fries from €1.40" }] },
+  { nom:"Mangez et cassez-vous", style:"Burger", arr:9,  adresse:"39 rue Taitbout 75009 Paris", prix:3.6, plat:"Burger maison au choix (5 recettes). Avec frites nature : 5 € pile", plat_en:"House burger, 5 recipes to choose from. With plain fries: exactly €5", tags:["CB acceptée"], photos:[{ src:"photos/mangez-et-cassez-vous.jpg", legende:"Burger maison + frites nature : 5 €", legende_en:"House burger + plain fries: €5" }, { src:"photos/mangez-et-cassez-vous-menu.jpg", legende:"Le menu : burger 3,60 €, frites dès 1,40 €", legende_en:"The menu: burger €3.60, fries from €1.40" }] },
+  { nom:"Mangez et cassez-vous", style:"Burger", arr:12, adresse:"5 boulevard de Picpus 75012 Paris", prix:3.6, plat:"Burger maison au choix (5 recettes). Avec frites nature : 5 € pile", plat_en:"House burger, 5 recipes to choose from. With plain fries: exactly €5", tags:["CB acceptée"], photos:[{ src:"photos/mangez-et-cassez-vous.jpg", legende:"Burger maison + frites nature : 5 €", legende_en:"House burger + plain fries: €5" }, { src:"photos/mangez-et-cassez-vous-menu.jpg", legende:"Le menu : burger 3,60 €, frites dès 1,40 €", legende_en:"The menu: burger €3.60, fries from €1.40" }] },
+  { nom:"Crêperie Oroyona", style:"Crêperie", arr:5, adresse:"36 rue Mouffetard 75005 Paris", prix:5.5, plat:"Menu galette + crêpe + boisson (servi jusqu'à 20h). À la carte : crêpes dès 1,50 €, galettes dès 3 €", plat_en:"Galette + crêpe + drink set menu (served until 8pm). À la carte: crêpes from €1.50, galettes from €3", tags:["végé", "ouvert le soir"], photos:[{ src:"photos/oroyona.jpg", legende:"Galette + crêpe, rue Mouffetard", legende_en:"Galette + crêpe on rue Mouffetard" }, { src:"photos/oroyona-contrescarpe.jpg", legende:"À déguster place de la Contrescarpe", legende_en:"Best eaten on Place de la Contrescarpe" }, { src:"photos/oroyona-menu.jpg", legende:"Le menu : formule à 5,50 € servie jusqu'à 20h", legende_en:"The menu: €5.50 set served until 8pm" }] },
+  { nom:"", style:"Street food",    arr:18, adresse:"", prix:null, plat:"", tags:[], photos:[] }
+];
+
+/* Anciennes adresses de « Paris à 10 balles », au-dessus de 5 € donc masquées.
+   Si le prix d'un plat seul passe sous 5 €, recopie la fiche dans RESTOS avec le nouveau prix.
+  { nom:"Banh Mi 13", style:"Vietnamien", arr:13, adresse:"73 avenue de Choisy 75013 Paris", prix:7, plat:"Formule: Banh mi Porc/Poulet/Végé + canette", tags:["végé", "ouvert dimanche"], photos:["photos/banh_mi_13.png"] },
+  { nom:"Chez NICOS", style:"Crêperie", arr:5, adresse:"44 rue Mouffetard 75005 Paris", prix:10, plat:"Crêpe maison (oeuf, fromage, viande hachée, pommes de terre, salade, tomates, oignons)", tags:["végé", "ouvert dimanche", "CB acceptée"], photos:["photos/chez_nicos.png"] },
+*/
+
+/* ============================================================
+   APP
+   ============================================================ */
+document.getElementById("don").href = KOFI_URL;
+document.getElementById("don2").href = KOFI_URL;
+
+const $ = id => document.getElementById(id);
+
+/* ============================================================
+   LANGUE (FR / EN)
+   ============================================================ */
+const STYLE_EN = {
+  "Boulangerie":"Bakery","Sandwich":"Sandwich","Raviolis / Bao":"Dumplings / Bao","Vietnamien":"Vietnamese","Chinois":"Chinese",
+  "Japonais":"Japanese","Libanais / Falafel":"Lebanese / Falafel","Indien":"Indian","Africain":"African","Crêperie":"Crêpes",
+  "Pizza à la part":"Pizza by the slice","Burger":"Burger","Végétarien":"Vegetarian","Street food":"Street food","Sucré":"Sweet"
+};
+const TAG_EN = { "végé":"veggie option","sur place":"eat in","ouvert le soir":"open evenings","ouvert dimanche":"open Sundays","CB acceptée":"cards accepted","espèces uniquement":"cash only" };
+const TOGGLE = {
+  fr:{ "végé":"Végé possible","sur place":"Sur place","ouvert le soir":"Ouvert le soir","ouvert dimanche":"Ouvert dimanche","CB acceptée":"CB acceptée" },
+  en:{ "végé":"Veggie option","sur place":"Eat in","ouvert le soir":"Open evenings","ouvert dimanche":"Open Sundays","CB acceptée":"Cards accepted" }
+};
+const I18N = {
+  fr:{
+    metaDesc:"Les adresses de Paris où manger pour 5 € (jusqu'à 5,99 €), par style de cuisine et par arrondissement, avec carte et itinéraire.",
+    arrRange:"Paris · 1<sup>er</sup> au 20<sup>e</sup> arr.",
+    tagline:"Les adresses où l'on mange à Paris pour 5 balles, centimes compris (jusqu'à 5,99 €). Testées sur place, triées par style et par arrondissement.",
+    don:"Offrir un repas à 5 €", don2:"Offrir un repas sur Ko-fi", install:"Installer l'app",
+    filters:"Filtres", searchPh:"Nom, plat, rue…", styleLabel:"Style de cuisine", arrLabel:"Arrondissement",
+    priceLabel:"Prix max", priceHint:"centimes compris", sortLabel:"Trier par", sortPrix:"Prix croissant", sortArr:"Arrondissement", sortNom:"Nom (A → Z)",
+    reset:"Tout réinitialiser", mapTitle:"Carte des adresses filtrées", mapHint:"Touche un prix pour lancer l'itinéraire",
+    legendExact:"Adresse exacte", legendApprox:"Position approximative (centre de l'arrondissement)",
+    footerNote:"Prix relevés sur place pour le plat indiqué, boisson non comprise sauf mention. Un prix a bougé ? Signale-le sur Instagram.",
+    close:"Fermer", prev:"Photo précédente", next:"Photo suivante", lbLabel:"Photos du restaurant",
+    iosTitle:"Installer sur ton téléphone", ios1:"Touche le bouton Partager (le carré avec une flèche vers le haut) dans Safari.",
+    ios2:"Fais défiler et choisis « Sur l'écran d'accueil ».", ios3:"Touche « Ajouter » : l'icône Paris à 5 balles apparaît avec tes apps.", ok:"Compris",
+    otherTitle:"Installer l'app", other1:"Ouvre le menu de ton navigateur (⋮ ou ⋯).", other2:"Choisis « Installer l'application » ou « Ajouter à l'écran d'accueil ».", other3:"L'icône Paris à 5 balles apparaît avec tes apps.",
+    all:"Tous", allParis:"Tout Paris", arrOpt:a=>`${a} arrondissement`,
+    count:n=>`<b>${n}</b> adresse${n>1?"s":""}`, empty:"Aucune adresse ne correspond. Élargis l'arrondissement ou monte le prix max.",
+    forPrice:"Pour ce prix : ", seeMap:"Voir sur la carte", go:"Y aller →", restoName:"Nom du restaurant", addAddr:"Adresse à ajouter",
+    cashWarn:"💶 Espèces uniquement, pas de carte bancaire.", approx:a=>`Position approximative : centre du ${a}.`,
+    navDir:"itinéraire", navApple:"Plans (Apple)", navCar:"voiture / scooter", navMetro:"métro / vélo",
+    photoOf:n=>`Photo de ${n}`, seePhotos:(n,name)=>`Voir ${n} photo${n>1?"s":""} de ${name}`, thisPlace:"ce restaurant",
+    upTo:e=>`Jusqu'à ${e},99 €`, btnPrice:e=>`${e},xx €`,
+    mapError:"La carte n'a pas pu se charger. Vérifie ta connexion, puis recharge la page."
+  },
+  en:{
+    metaDesc:"Places in Paris where you can eat for €5 (up to €5.99), by food style and district, with a map and directions.",
+    arrRange:"Paris · 1<sup>st</sup> to 20<sup>th</sup> arr.",
+    tagline:"Where to eat in Paris for 5 balles (French slang for euros), cents included: up to €5.99. Tested in person, sorted by food style and district.",
+    don:"Buy me a €5 meal", don2:"Buy me a meal on Ko-fi", install:"Install the app",
+    filters:"Filters", searchPh:"Name, dish, street…", styleLabel:"Food style", arrLabel:"District",
+    priceLabel:"Max price", priceHint:"cents included", sortLabel:"Sort by", sortPrix:"Lowest price", sortArr:"District", sortNom:"Name (A → Z)",
+    reset:"Reset all", mapTitle:"Map of filtered places", mapHint:"Tap a price to get directions",
+    legendExact:"Exact address", legendApprox:"Approximate location (centre of the district)",
+    footerNote:"Prices checked in person for the dish shown, drinks not included unless stated. Has a price changed? Let us know on Instagram.",
+    close:"Close", prev:"Previous photo", next:"Next photo", lbLabel:"Restaurant photos",
+    iosTitle:"Install on your phone", ios1:"Tap the Share button (the square with an up arrow) in Safari.",
+    ios2:"Scroll down and choose “Add to Home Screen”.", ios3:"Tap “Add”: the Paris à 5 balles icon appears with your apps.", ok:"Got it",
+    otherTitle:"Install the app", other1:"Open your browser menu (⋮ or ⋯).", other2:"Choose “Install app” or “Add to Home Screen”.", other3:"The Paris à 5 balles icon appears with your apps.",
+    all:"All", allParis:"All of Paris", arrOpt:a=>`${a} arrondissement`,
+    count:n=>`<b>${n}</b> place${n>1?"s":""}`, empty:"No place matches. Try another district or a higher max price.",
+    forPrice:"For this price: ", seeMap:"Show on map", go:"Directions →", restoName:"Restaurant name", addAddr:"Address to add",
+    cashWarn:"💶 Cash only, no cards.", approx:a=>`Approximate location: centre of the ${a}.`,
+    navDir:"directions", navApple:"Apple Maps", navCar:"car / scooter", navMetro:"metro / bike",
+    photoOf:n=>`Photo of ${n}`, seePhotos:(n,name)=>`See ${n} photo${n>1?"s":""} of ${name}`, thisPlace:"this place",
+    upTo:e=>`Up to €${e}.99`, btnPrice:e=>`€${e}.xx`,
+    mapError:"The map couldn't load. Check your connection, then reload the page."
+  }
+};
+const LANG_KEY = "p5b-lang";
+let LANG = (() => {
+  if (/^#en$/i.test(location.hash)) return "en";
+  if (/^#fr$/i.test(location.hash)) return "fr";
+  try { const v = localStorage.getItem(LANG_KEY); if (v === "fr" || v === "en") return v; } catch(e) {}
+  return /^fr/i.test(navigator.language || "fr") ? "fr" : "en";
+})();
+const T = k => I18N[LANG][k];
+const styleName = s => LANG === "en" ? (STYLE_EN[s] || s) : s;
+const tagName = t => LANG === "en" ? (TAG_EN[t] || t) : t;
+const platOf = r => (LANG === "en" && r.plat_en) ? r.plat_en : r.plat;
+const legendeOf = p => (LANG === "en" && p.legende_en) ? p.legende_en : (p.legende || "");
+
+function applyStatic(){
+  document.documentElement.lang = LANG;
+  $("meta-desc").setAttribute("content", T("metaDesc"));
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = T(el.dataset.i18nHtml); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = T(el.dataset.i18nPh); });
+  document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", T(el.dataset.i18nAria)); });
+  document.querySelectorAll("[data-tagtoggle]").forEach(el => { el.textContent = TOGGLE[LANG][el.dataset.tagtoggle]; });
+  document.querySelectorAll("#max button").forEach(b => { b.textContent = T("btnPrice")(b.dataset.max); b.title = T("upTo")(b.dataset.max); });
+  document.querySelectorAll("#lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === LANG));
+}
+const PRIX_MAX = 5;   // plafond du concept : 5 € et les centimes (jusqu'à 5,99 €)
+const sousPlafond = (prix, euros) => prix < euros + 1;   // "5 €" inclut 5,00 à 5,99
+const state = { q:"", style:"Tous", arr:"0", max:PRIX_MAX, sort:"prix", tags:new Set() };
+const isTodo = r => !r.nom || !r.nom.trim();
+const arrLabel = n => LANG === "en" ? n + ([,"st","nd","rd"][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || "th") : (n === 1 ? "1er" : n + "e");
+const norm = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtPrix = p => { const v = (Math.round(p*100)/100).toFixed(p % 1 ? 2 : 0); return LANG === "en" ? v : v.replace(".", ","); };
+const money = p => LANG === "en" ? `€${fmtPrix(p)}` : `${fmtPrix(p)} €`;
+
+/* Chips de style */
+function buildChips(){
+  const counts = {};
+  const visibles = RESTOS.filter(r => !isTodo(r));
+  visibles.forEach(r => counts[r.style] = (counts[r.style]||0)+1);
+  const styles = ["Tous", ...STYLES.filter(s => counts[s])];  // clé FR, libellé traduit
+  $("chips").innerHTML = styles.map(s =>
+    `<button type="button" class="chip" data-style="${esc(s)}" aria-pressed="${s===state.style}">${esc(s==="Tous" ? T("all") : styleName(s))}<span class="n">${s==="Tous"?visibles.length:counts[s]}</span></button>`
+  ).join("");
+}
+$("chips").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if(!b) return;
+  state.style = b.dataset.style;
+  $("chips").querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", c===b));
+  render();
+});
+
+/* Arrondissements */
+function buildArr(){
+  const v = $("arr").value || state.arr;
+  $("arr").innerHTML = `<option value="0">${T("allParis")}</option>` +
+    Array.from({length:20},(_,i)=>`<option value="${i+1}">${T("arrOpt")(arrLabel(i+1))}</option>`).join("");
+  $("arr").value = v;
+}
+
+$("q").addEventListener("input", e => { state.q = norm(e.target.value); render(); });
+$("arr").addEventListener("change", e => { state.arr = e.target.value; render(); });
+$("sort").addEventListener("change", e => { state.sort = e.target.value; render(); });
+function setMax(v){
+  state.max = v;
+  $("max").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.max === v));
+}
+$("max").addEventListener("click", e => {
+  const b = e.target.closest("button[data-max]"); if (!b) return;
+  setMax(+b.dataset.max); render();
+});
+document.querySelectorAll(".tog input").forEach(cb => cb.addEventListener("change", () => {
+  cb.checked ? state.tags.add(cb.dataset.tag) : state.tags.delete(cb.dataset.tag);
+  render();
+}));
+$("reset").addEventListener("click", () => {
+  Object.assign(state, { q:"", style:"Tous", arr:"0", sort:"prix" }); setMax(PRIX_MAX); state.tags.clear();
+  $("q").value=""; $("arr").value="0"; $("sort").value="prix";
+  document.querySelectorAll(".tog input").forEach(cb => cb.checked=false);
+  buildChips(); render();
+});
+
+const icoPin = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>`;
+
+/* ============================================================
+   CARTE
+   ============================================================ */
+/* Centre approximatif de chaque arrondissement */
+const ARR_CENTRE = {
+  1:[48.8625,2.3363], 2:[48.8683,2.3428], 3:[48.8630,2.3600], 4:[48.8543,2.3576],
+  5:[48.8445,2.3500], 6:[48.8491,2.3328], 7:[48.8562,2.3122], 8:[48.8727,2.3125],
+  9:[48.8770,2.3375],10:[48.8761,2.3607],11:[48.8590,2.3800],12:[48.8400,2.3880],
+ 13:[48.8283,2.3623],14:[48.8291,2.3265],15:[48.8401,2.2930],16:[48.8600,2.2760],
+ 17:[48.8873,2.3067],18:[48.8925,2.3484],19:[48.8871,2.3848],20:[48.8634,2.4012]
+};
+/* Tracés de repère dessinés sous les tuiles (visibles même hors ligne) */
+const PERIPH = [[48.878,2.283],[48.894,2.314],[48.898,2.359],[48.897,2.386],[48.888,2.398],[48.864,2.408],[48.847,2.411],[48.832,2.392],[48.821,2.369],[48.819,2.359],[48.823,2.326],[48.827,2.305],[48.832,2.287],[48.838,2.257],[48.848,2.256],[48.858,2.262],[48.871,2.274]];
+const SEINE = [[48.8215,2.4125],[48.835,2.380],[48.843,2.366],[48.851,2.357],[48.853,2.349],[48.857,2.341],[48.860,2.333],[48.865,2.320],[48.864,2.302],[48.858,2.294],[48.853,2.287],[48.848,2.280],[48.846,2.276],[48.838,2.270],[48.833,2.262]];
+
+const GEO_KEY = "p10b-geo-v1";
+let geoCache = {};
+try { geoCache = JSON.parse(localStorage.getItem(GEO_KEY) || "{}"); } catch(e) {}
+const geoId = r => norm(`${r.adresse}|${r.arr}`);
+
+/* Position d'une fiche : exacte (lat/lng ou géocodée) sinon centre d'arrondissement décalé */
+function pos(r){
+  if (typeof r.lat === "number" && typeof r.lng === "number") return { ll:[r.lat,r.lng], exact:true };
+  const g = r.adresse && geoCache[geoId(r)];
+  if (g) return { ll:g, exact:true };
+  const c = ARR_CENTRE[r.arr] || [48.8566,2.3522];
+  const i = RESTOS.indexOf(r);
+  const a = i * 2.39996, d = 0.0025 + (i % 3) * 0.0012;     // petite spirale pour éviter les superpositions
+  return { ll:[c[0] + Math.sin(a)*d, c[1] + Math.cos(a)*d*1.5], exact:false };
+}
+
+const isApple = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent) && "ontouchend" in document;
+function navLinks(r, p){
+  const [lat,lng] = p.ll;
+  const dest = p.exact ? `${lat},${lng}` : encodeURIComponent(`${r.nom} ${r.adresse} Paris`.trim() || `${lat},${lng}`);
+  const links = [
+    { name:"Google Maps", sub:T("navDir"), href:`https://www.google.com/maps/dir/?api=1&destination=${dest}` },
+    { name:T("navApple"), sub:"iPhone", href:`https://maps.apple.com/?daddr=${dest}` },
+    { name:"Waze", sub:T("navCar"), href:`https://waze.com/ul?ll=${lat},${lng}&navigate=yes` },
+    { name:"Citymapper", sub:T("navMetro"), href:`https://citymapper.com/directions?endcoord=${lat},${lng}&endname=${encodeURIComponent(r.nom||"Restaurant")}` }
+  ];
+  if (isApple) links.unshift(links.splice(1,1)[0]);
+  return links;
+}
+
+let map = null, layer = null, markers = new Map(), activeI = null;
+function initMap(){
+  if (!window.L) { $("map").innerHTML = `<div class="empty" style="height:100%;display:grid;place-items:center">${T("mapError")}</div>`; return; }
+  map = L.map("map", { zoomControl:true, scrollWheelZoom:false, tap:true }).setView([48.8566,2.3522], 12);
+  const cs = getComputedStyle(document.documentElement);
+  L.polygon(PERIPH, { color:cs.getPropertyValue("--peri").trim(), weight:2, fill:false, interactive:false }).addTo(map);
+  L.polyline(SEINE, { color:cs.getPropertyValue("--seine").trim(), weight:5, interactive:false }).addTo(map);
+  /* Fond de carte OpenStreetMap (gratuit, sans clé). Si le serveur France ne répond pas, bascule sur le serveur principal. */
+  const OSM_ATTR = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">les contributeurs OpenStreetMap</a>';
+  const tilesFR = L.tileLayer("https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png", { maxZoom:19, subdomains:"abc", attribution:OSM_ATTR + " · OSM France" });
+  const tilesOSM = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:19, attribution:OSM_ATTR });
+  let errs = 0, switched = false;
+  tilesFR.on("tileerror", () => {
+    if (!switched && ++errs >= 3) { switched = true; map.removeLayer(tilesFR); tilesOSM.addTo(map); }
+  });
+  tilesFR.addTo(map);
+  layer = L.layerGroup().addTo(map);
+  const fix = () => map.invalidateSize();
+  window.addEventListener("load", fix);
+  document.fonts?.ready?.then(fix);
+  if (window.ResizeObserver) new ResizeObserver(fix).observe($("map"));
+  map.on("click", () => setActive(null));
+  map.on("popupclose", () => setActive(null));
+  map.on("popupopen", e => {
+    const b = e.popup.getElement()?.querySelector("[data-photos]");
+    if (b) b.addEventListener("click", ev => { ev.stopPropagation(); openLb(+b.dataset.photos); });
+  });
+}
+
+function popupHtml(r, p){
+  const todo = isTodo(r);
+  return `<div class="pop">
+    <div class="s">${esc(styleName(r.style))} · ${arrLabel(r.arr)}</div>
+    <h3>${todo ? T("restoName") : esc(r.nom)}</h3>
+    ${photoBtn(r, "pop-photo")}
+    <div class="a">${r.adresse ? esc(r.adresse) : T("addAddr")}${r.prix!=null ? ` · <b>${money(r.prix)}</b>` : ""}</div>
+    ${(r.tags||[]).some(t=>/esp[eè]ces/i.test(t)) ? `<div class="warn">${T("cashWarn")}</div>` : ""}
+    ${p.exact ? "" : `<div class="warn">${T("approx")(arrLabel(r.arr))}</div>`}
+    <div class="nav">${navLinks(r,p).map(l=>`<a href="${l.href}" target="_blank" rel="noopener">${l.name}<span>${l.sub}</span></a>`).join("")}</div>
+  </div>`;
+}
+
+function setActive(i){
+  if (activeI != null && markers.get(activeI)) markers.get(activeI).getElement()?.querySelector(".pin-b")?.classList.remove("active");
+  activeI = i;
+  if (i != null && markers.get(i)) markers.get(i).getElement()?.querySelector(".pin-b")?.classList.add("active");
+}
+
+function updateMap(list, fit = true){
+  if (!map) return;
+  layer.clearLayers(); markers.clear();
+  const pts = [];
+  list.forEach(r => {
+    const i = RESTOS.indexOf(r), p = pos(r);
+    const label = r.prix != null ? money(r.prix) : "📍";
+    const icon = L.divIcon({ className:"pin", iconSize:[0,0], html:`<span class="pin-b${p.exact?"":" approx"}">${label}</span>` });
+    const m = L.marker(p.ll, { icon, title: r.nom || r.style, keyboard:true, riseOnHover:true })
+      .bindPopup(() => popupHtml(r, pos(r)), { maxWidth:260, autoPanPadding:[20,20] })
+      .on("click", () => setActive(i));
+    m.addTo(layer); markers.set(i, m); pts.push(p.ll);
+  });
+  if (fit && pts.length) map.fitBounds(pts, { padding:[40,40], maxZoom:15 });
+}
+
+function focusResto(i){
+  const m = markers.get(i); if (!m || !map) return;
+  $("map").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"center" });
+  map.setView(m.getLatLng(), Math.max(map.getZoom(), 15));
+  setActive(i); m.openPopup();
+}
+
+/* Géocodage des adresses sans lat/lng (Nominatim, 1 requête/s, mis en cache) */
+async function geocodeMissing(){
+  const todo = RESTOS.filter(r => r.adresse && typeof r.lat !== "number" && !geoCache[geoId(r)]);
+  for (const r of todo){
+    try{
+      const q = encodeURIComponent(`${r.adresse}, 750${String(r.arr).padStart(2,"0")} Paris, France`);
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`, { headers:{ "Accept-Language":"fr" } });
+      const j = await res.json();
+      if (j[0]) {
+        geoCache[geoId(r)] = [+j[0].lat, +j[0].lon];
+        try { localStorage.setItem(GEO_KEY, JSON.stringify(geoCache)); } catch(e) {}
+        render(false);
+      }
+    } catch(e) { return; }  // hors ligne ou bloqué : on garde la position approximative
+    await new Promise(ok => setTimeout(ok, 1100));
+  }
+}
+
+$("grid").addEventListener("click", e => {
+  const b = e.target.closest(".locate"); if (b) focusResto(+b.dataset.i);
+});
+
+/* ============================================================
+   PHOTOS
+   ============================================================ */
+const photosOf = r => (r.photos || []).map(p => typeof p === "string" ? { src:p, legende:"" } : p).filter(p => p && p.src);
+const icoImg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg>`;
+function photoBtn(r, cls){
+  const ph = photosOf(r); if (!ph.length) return "";
+  const i = RESTOS.indexOf(r), n = ph.length;
+  const alt = esc(legendeOf(ph[0]) || T("photoOf")(r.nom || styleName(r.style)));
+  return `<button type="button" class="${cls}" data-photos="${i}" aria-label="${esc(T("seePhotos")(n, r.nom || T("thisPlace")))}">
+    <img src="${esc(ph[0].src)}" alt="${alt}" loading="lazy" decoding="async" onerror="this.closest('button').remove()">
+    ${cls === "photo" && n > 1 ? `<span class="nb">${icoImg}${n}</span>` : ""}
+  </button>`;
+}
+
+let lbList = [], lbIdx = 0, lbName = "", lbBack = null;
+function lbShow(){
+  const p = lbList[lbIdx];
+  $("lb-img").src = p.src;
+  $("lb-img").alt = legendeOf(p) || T("photoOf")(lbName);
+  $("lb-cap").innerHTML = `${esc(legendeOf(p) || lbName)}${lbList.length > 1 ? `<span class="c">${lbIdx+1}/${lbList.length}</span>` : ""}`;
+  $("lb-prev").hidden = $("lb-next").hidden = lbList.length < 2;
+}
+function openLb(i){
+  const r = RESTOS[i]; lbList = photosOf(r); if (!lbList.length) return;
+  lbIdx = 0; lbName = r.nom || r.style; lbBack = document.activeElement;
+  lbShow(); $("lb").hidden = false; document.body.style.overflow = "hidden"; $("lb-x").focus();
+}
+function closeLb(){ $("lb").hidden = true; document.body.style.overflow = ""; $("lb-img").removeAttribute("src"); lbBack?.focus?.(); }
+const lbStep = d => { lbIdx = (lbIdx + d + lbList.length) % lbList.length; lbShow(); };
+$("lb-x").addEventListener("click", closeLb);
+$("lb-prev").addEventListener("click", e => { e.stopPropagation(); lbStep(-1); });
+$("lb-next").addEventListener("click", e => { e.stopPropagation(); lbStep(1); });
+$("lb").addEventListener("click", e => { if (e.target.id === "lb") closeLb(); });
+document.addEventListener("keydown", e => {
+  if ($("lb").hidden) return;
+  if (e.key === "Escape") closeLb();
+  else if (e.key === "ArrowLeft" && lbList.length > 1) lbStep(-1);
+  else if (e.key === "ArrowRight" && lbList.length > 1) lbStep(1);
+});
+let tx = null;
+$("lb").addEventListener("touchstart", e => { tx = e.touches[0].clientX; }, { passive:true });
+$("lb").addEventListener("touchend", e => {
+  if (tx == null || lbList.length < 2) return;
+  const dx = e.changedTouches[0].clientX - tx; tx = null;
+  if (Math.abs(dx) > 40) lbStep(dx < 0 ? 1 : -1);
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-photos]"); if (b) openLb(+b.dataset.photos);
+});
+
+function card(r){
+  const todo = isTodo(r);
+  const mapsQ = encodeURIComponent(`${r.nom} ${r.adresse} 750${String(r.arr).padStart(2,"0")} Paris`);
+  const prix = r.prix != null
+    ? `<div class="prix">${fmtPrix(r.prix)}<small>€</small></div>`
+    : `<div class="prix vide">–<small>€</small></div>`;
+  return `<article class="card${todo?" todo":""}">
+    ${photoBtn(r, "photo")}
+    <div class="card-top">
+      <div style="min-width:0">
+        <h2>${todo ? T("restoName") : esc(r.nom)}</h2>
+        <div class="style">${esc(styleName(r.style))}</div>
+      </div>
+      ${prix}
+    </div>
+    <div class="perfo"></div>
+    <div class="card-body">
+      <div class="plat"><span class="k">${T("forPrice")}</span>${platOf(r) ? esc(platOf(r)) : "<em>…</em>"}</div>
+      <div class="addr">${r.adresse ? esc(r.adresse) : `<em>${T("addAddr")}</em>`}</div>
+      ${r.tags?.length ? `<div class="tags">${r.tags.map(t=>`<span class="tag${/esp[eè]ces/i.test(t)?" cash":""}">${/esp[eè]ces/i.test(t)?"💶 ":""}${esc(tagName(t))}</span>`).join("")}</div>` : ""}
+    </div>
+    <div class="card-foot">
+      <span class="arr-badge${r.arr?"":" vide"}">${r.arr ? arrLabel(r.arr) : "Paris"}</span>
+      <button type="button" class="locate" data-i="${RESTOS.indexOf(r)}">${icoPin}${T("seeMap")}</button>
+      ${todo ? `<span class="todo-flag">À remplir</span>`
+             : `<a class="maplink" href="${navLinks(r, pos(r))[0].href}" target="_blank" rel="noopener">${T("go")}</a>`}
+    </div>
+  </article>`;
+}
+
+function render(fit = true){
+  let list = RESTOS.filter(r => {
+    if (isTodo(r)) return false;   // fiche vide : cachée tant qu'elle n'est pas remplie
+    if (state.style !== "Tous" && r.style !== state.style) return false;
+    if (state.arr !== "0" && String(r.arr) !== state.arr) return false;
+    if (r.prix != null && !(sousPlafond(r.prix, state.max) && sousPlafond(r.prix, PRIX_MAX))) return false;
+    for (const t of state.tags) if (!(r.tags||[]).includes(t)) return false;
+    if (state.q && !norm([r.nom,r.plat,r.plat_en,r.adresse,r.style,STYLE_EN[r.style]].join(" ")).includes(state.q)) return false;
+    return true;
+  });
+  const by = {
+    prix:(a,b)=>(a.prix??99)-(b.prix??99),
+    arr:(a,b)=>a.arr-b.arr,
+    nom:(a,b)=>(a.nom||"~").localeCompare(b.nom||"~",LANG)
+  }[state.sort];
+  list.sort((a,b)=> (isTodo(a)-isTodo(b)) || by(a,b));
+
+  $("count").innerHTML = T("count")(list.length);
+  $("notice").hidden = true;
+  $("grid").innerHTML = list.length ? list.map(card).join("")
+    : `<div class="empty">${T("empty")}</div>`;
+  updateMap(list, fit);
+}
+
+/* Changement de langue */
+function setLang(l){
+  if (l === LANG) return;
+  LANG = l;
+  try { localStorage.setItem(LANG_KEY, l); } catch(e) {}
+  applyStatic(); buildArr(); buildChips(); map?.closePopup(); render(false);
+}
+$("lang").addEventListener("click", e => { const b = e.target.closest("button[data-lang]"); if (b) setLang(b.dataset.lang); });
+
+/* ============================================================
+   INSTALLATION (application installable / PWA)
+   ============================================================ */
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; if (!isStandalone()) $("install").hidden = false; });
+window.addEventListener("appinstalled", () => { installEvt = null; $("install").hidden = true; });
+if (isIOS && !isStandalone()) $("install").hidden = false;   // Safari iOS : pas d'invite automatique, on affiche le mode d'emploi
+function showHelp(kind){
+  const k = kind === "ios" ? ["iosTitle","ios1","ios2","ios3"] : ["otherTitle","other1","other2","other3"];
+  $("ios-help-title").textContent = T(k[0]);
+  $("ios-help").querySelectorAll("li").forEach((li,i) => li.textContent = T(k[i+1]));
+  $("ios-help").hidden = false; $("ios-help-ok").focus();
+}
+$("install").addEventListener("click", async () => {
+  if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice; if (r.outcome === "accepted") $("install").hidden = true; installEvt = null; }
+  else showHelp(isIOS ? "ios" : "other");
+});
+$("ios-help-ok").addEventListener("click", () => { $("ios-help").hidden = true; $("install").focus(); });
+$("ios-help").addEventListener("click", e => { if (e.target.id === "ios-help") $("ios-help").hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("ios-help").hidden) $("ios-help").hidden = true; });
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+
+applyStatic(); buildArr(); initMap(); buildChips(); render(); geocodeMissing();
+</script>
+</body>
+</html>
