@@ -1,6 +1,6 @@
 /* Service worker de Paris à 5 balles.
    Change VERSION à chaque mise en ligne pour que les téléphones récupèrent la nouvelle version. */
-const VERSION = "p5b-v2";
+const VERSION = "p5b-v3";
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 const TILES = `${VERSION}-tiles`;
